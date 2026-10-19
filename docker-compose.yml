@@ -1,0 +1,40 @@
+# 3-node Raft cluster.
+#   docker compose up --build -d
+#   curl -X PUT -d hello localhost:8001/kv/greeting   (any node; followers redirect with 421)
+#   docker compose run --rm bench -mode write -c 32 -d 15s
+#   docker compose stop n1                              (kill a node, watch failover)
+x-node: &node
+  build: .
+  image: raft-kv-store:local
+  environment: &env
+    DATA_DIR: /data
+    CLUSTER: n1=http://n1:8001,n2=http://n2:8002,n3=http://n3:8003
+    SNAPSHOT_BYTES: "4194304"
+  user: "0:0" # named volumes are root-owned; fine for a demo cluster
+
+services:
+  n1:
+    <<: *node
+    environment: { <<: *env, ID: n1, LISTEN: ":8001" }
+    ports: ["8001:8001"]
+    volumes: [n1-data:/data]
+  n2:
+    <<: *node
+    environment: { <<: *env, ID: n2, LISTEN: ":8002" }
+    ports: ["8002:8002"]
+    volumes: [n2-data:/data]
+  n3:
+    <<: *node
+    environment: { <<: *env, ID: n3, LISTEN: ":8003" }
+    ports: ["8003:8003"]
+    volumes: [n3-data:/data]
+  bench:
+    image: raft-kv-store:local
+    entrypoint: ["/app/kvbench", "-nodes", "http://n1:8001,http://n2:8002,http://n3:8003"]
+    profiles: ["bench"]
+    depends_on: [n1, n2, n3]
+
+volumes:
+  n1-data:
+  n2-data:
+  n3-data:

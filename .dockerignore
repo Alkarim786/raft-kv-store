@@ -1,0 +1,5 @@
+.git
+bin
+data
+*.exe
+.env
